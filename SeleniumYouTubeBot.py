@@ -290,7 +290,6 @@ def checkForSomethingWentWrongMessage():
     pass
   
 channelVideosURL = "https://www.youtube.com/@SecularTalk/videos"
-channelVideosURL = "https://www.youtube.com/@SecularTalk/videos"
 
 videoStartNumber = 1 # Start the search from this video number from the top down on the youtube channel
 #videoStartNumber = 7433 #Start the search from this video number from the top down on the youtube channel
