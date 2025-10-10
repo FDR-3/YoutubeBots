@@ -2,7 +2,7 @@ import os
 import time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import StaleElementReferenceException, ElementClickInterceptedException, TimeoutException, NoSuchElementException
+from selenium.common.exceptions import StaleElementReferenceException, ElementClickInterceptedException, TimeoutException, NoSuchElementException, ElementNotInteractableException
 #from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.support.ui import WebDriverWait
@@ -16,7 +16,7 @@ progressSavedFile = "SeleniumYoutubeBotSavedProgress.txt"
 thumbNailId = "#thumbnail"
 
 TIME_OUT = 1 #time out in seconds
-SHOW_TRANSCRIPT_MAX_TRY_COUNT = 20
+SHOW_TRANSCRIPT_MAX_TRY_COUNT = 100
 
 brave_path = r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe" #Replace with your actual path
 
@@ -25,7 +25,8 @@ brave_options = ChromeOptions()
 brave_options.binary_location = brave_path
 
 #Initialize the Chrome WebDriver with the Brave options
-driver = webdriver.Chrome(options=brave_options)
+#driver = webdriver.Chrome(options=brave_options)
+driver = webdriver.Chrome()
 
 def searchChannelForString(channelVideosURL, searchStringList, videoStartNumber, videoStopNumber, backwardsSearch = False):
   global nextVideoToCheck
@@ -117,14 +118,16 @@ def searchNextVideoThumbNail(searchStringList, backwardsSearch):
   clicked = False
   while clicked == False:
     try:
-      nextThumbNail = driver.find_element(By.CSS_SELECTOR, f":nth-child({nextVideoToCheck}) > #content > .ytd-rich-item-renderer > #dismissible > :nth-child(1) > ytd-thumbnail.style-scope > #thumbnail > yt-image.style-scope > .yt-core-image")
+      nextThumbNail = driver.find_element(By.XPATH, f"/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/ytd-two-column-browse-results-renderer/div[1]/ytd-rich-grid-renderer/div[6]/ytd-rich-item-renderer[{nextVideoToCheck}]/div/ytd-rich-grid-media/div[1]/div[1]/ytd-thumbnail/a/yt-image/img")
+
       if nextThumbNail:
         #Open the link in a new tab using Ctrl+Click (or Command+Click on macOS)
         actions = ActionChains(driver)
         actions.key_down(Keys.CONTROL).click(nextThumbNail).key_up(Keys.CONTROL).perform() #for windows and linux
         #actions.key_down(Keys.COMMAND).click(button).key_up(Keys.COMMAND).perform() #for Mac OS
         clicked = True
-    except Exception:
+    except Exception as errorMessage:
+      print(errorMessage)
       print("Thumbnail not reachable. Attemping to scroll down.")
       #Scroll to the bottom incase we can't reach the video
       scrollToBottomOfPage()
@@ -149,7 +152,7 @@ def searchNextVideoThumbNail(searchStringList, backwardsSearch):
       return
   except NoSuchElementException:
     pass
-
+    
   searched = False
   while searched == False:
     '''
@@ -199,10 +202,13 @@ def searchNextVideoThumbNail(searchStringList, backwardsSearch):
       try:
         if showTranscriptTryCount < SHOW_TRANSCRIPT_MAX_TRY_COUNT:
           #element = WebDriverWait(driver, TIME_OUT).until(EC.presence_of_element_located(element_locator))
-          showTranscriptButton = driver.find_element(By.CSS_SELECTOR, "#structured-description > :nth-child(2) > ytd-video-description-transcript-section-renderer.style-scope > #button-container > #primary-button > .style-scope > yt-button-shape > .yt-spec-button-shape-next")
-          if showTranscriptButton.is_displayed():
-            showTranscriptButton.click()
-            clicked = True
+          #showTranscriptButton = driver.find_element(By.CSS_SELECTOR, "#structured-description > :nth-child(2) > ytd-video-description-transcript-section-renderer.style-scope > #button-container > #primary-button > .style-scope > yt-button-shape > .yt-spec-button-shape-next")
+          showTranscriptButton = driver.find_element(By.XPATH, '//*[@id="primary-button"]/ytd-button-renderer/yt-button-shape/button/yt-touch-feedback-shape/div[2]')
+
+          #showTranscriptButton.click()
+          # 3. Execute JavaScript click directly on the element
+          driver.execute_script("arguments[0].click();", showTranscriptButton)
+          clicked = True
         else:
           with open(noTranscriptFoundFile, "a") as file:
             print("No transcript button found. Skipping video.")
@@ -211,7 +217,8 @@ def searchNextVideoThumbNail(searchStringList, backwardsSearch):
             nextVideoToCheck += 1
             closeVideoAndSwitchBackToMainTab()
           return
-      except (StaleElementReferenceException, ElementClickInterceptedException, NoSuchElementException):
+      except (StaleElementReferenceException, ElementClickInterceptedException, NoSuchElementException, ElementNotInteractableException) as message:
+        print(message)
         print("The element is stale. Trying to show transcript again.")
         checkForSomethingWentWrongMessage()
         showTranscriptTryCount += 1
@@ -271,8 +278,8 @@ def scrollToBottomOfPage():
 
 def closeVideoAndSwitchBackToMainTab():
   driver.close()
-  main_window = driver.window_handles[0]
-  driver.switch_to.window(main_window)
+  mainWindow = driver.window_handles[0]
+  driver.switch_to.window(mainWindow)
 
 def checkForSomethingWentWrongMessage():
   try:
@@ -284,8 +291,8 @@ def checkForSomethingWentWrongMessage():
   
 channelVideosURL = "https://www.youtube.com/@SecularTalk/videos"
 
-#videoStartNumber = 1 # Start the search from this video number from the top down on the youtube channel
-videoStartNumber = 7433 #Start the search from this video number from the top down on the youtube channel
+videoStartNumber = 1 # Start the search from this video number from the top down on the youtube channel
+#videoStartNumber = 7433 #Start the search from this video number from the top down on the youtube channel
 videoStopNumber = -1 #-1 if unused
 searchStringList = ["Jiggly Puff", "JigglyPuff"]
 
