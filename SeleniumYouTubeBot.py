@@ -16,7 +16,7 @@ progressSavedFile = "SeleniumYoutubeBotSavedProgress.txt"
 thumbNailId = "#thumbnail"
 
 TIME_OUT = 1 #time out in seconds
-SHOW_TRANSCRIPT_MAX_TRY_COUNT = 100
+SHOW_TRANSCRIPT_MAX_TRY_COUNT = 20
 
 brave_path = r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe" #Replace with your actual path
 
@@ -289,6 +289,7 @@ def checkForSomethingWentWrongMessage():
   except NoSuchElementException:
     pass
   
+channelVideosURL = "https://www.youtube.com/@SecularTalk/videos"
 channelVideosURL = "https://www.youtube.com/@SecularTalk/videos"
 
 videoStartNumber = 1 # Start the search from this video number from the top down on the youtube channel
