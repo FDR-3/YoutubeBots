@@ -25,10 +25,10 @@ brave_options = ChromeOptions()
 brave_options.binary_location = brave_path
 
 #Initialize the Chrome WebDriver with the Brave options
-#driver = webdriver.Chrome(options=brave_options)
-driver = webdriver.Chrome()
+driver = webdriver.Chrome(options=brave_options)
+#driver = webdriver.Chrome()
 
-def searchChannelForString(channelVideosURL, searchStringList, videoStartNumber, videoStopNumber, backwardsSearch = False):
+def searchChannelForString(channelVideosURL, searchStringList, videoStartNumber, videoStopNumber, backwardsSearch):
   global nextVideoToCheck
   nextVideoToCheck = videoStartNumber
 
@@ -118,7 +118,7 @@ def searchNextVideoThumbNail(searchStringList, backwardsSearch):
   clicked = False
   while clicked == False:
     try:
-      nextThumbNail = driver.find_element(By.XPATH, f"/html/body/ytd-app/div[1]/ytd-page-manager/ytd-browse/ytd-two-column-browse-results-renderer/div[1]/ytd-rich-grid-renderer/div[6]/ytd-rich-item-renderer[{nextVideoToCheck}]/div/ytd-rich-grid-media/div[1]/div[1]/ytd-thumbnail/a/yt-image/img")
+      nextThumbNail = driver.find_element(By.XPATH, f"//ytd-rich-item-renderer[{nextVideoToCheck}]//a[@id='thumbnail']")
 
       if nextThumbNail:
         #Open the link in a new tab using Ctrl+Click (or Command+Click on macOS)
@@ -230,7 +230,11 @@ def searchNextVideoThumbNail(searchStringList, backwardsSearch):
       transcriptLines = WebDriverWait(driver, TIME_OUT).until(EC.presence_of_all_elements_located(element_locator))
       #elements = driver.find_elements(By.CSS_SELECTOR, cssSelector) This doesn't return any of them
       print("transcript lines: ", len(transcriptLines))
+
+      found = False
       for transcriptLine in transcriptLines:
+        if found == True:
+          break
         for searchString in searchStringList:
           if searchString.lower() in transcriptLine.text.lower():
             #If match found, append it to MatchFoundFile
@@ -238,6 +242,7 @@ def searchNextVideoThumbNail(searchStringList, backwardsSearch):
               print("Found string!")
               file.write(f"Video Number: {nextVideoToCheck}" + "\n")
               file.write(driver.current_url + "\n")
+            found = True
             break
       #Create/overwrite progress file to save the last video number and url that was checked in case of restarts
       with open(progressSavedFile, "w") as file:
@@ -295,5 +300,6 @@ videoStartNumber = 1 # Start the search from this video number from the top down
 #videoStartNumber = 7433 #Start the search from this video number from the top down on the youtube channel
 videoStopNumber = -1 #-1 if unused
 searchStringList = ["Jiggly Puff", "JigglyPuff"]
+backwardsSearch = False
 
-searchChannelForString(channelVideosURL, searchStringList, videoStartNumber, videoStopNumber, False)
+searchChannelForString(channelVideosURL, searchStringList, videoStartNumber, videoStopNumber, backwardsSearch)
