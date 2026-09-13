@@ -93,9 +93,8 @@ def saveSearchProgress(searchStartTime, videoCount, videoId, videoPostTime):
     file.write(f"Video Post Time: {videoPostTime}" + "\n")
     file.write(f"Current run time: {hours} hours, {minutes} minutes, and {seconds} seconds")
 
-channelID = "UCldfgbzNILYZA4dmDt4Cd6A"
-searchTerms = ["JigglyPuff", "Jiggly Puff"]
+channelID = "UCIGZdKWnzUq77q7mgE01mMQ"#kagethedon001
+searchTerms = ["Lock in", "On business"]
 videoStartNumber = 1
-#videoStartNumber = 11384
 
 searchChannelForString(channelID, searchTerms, videoStartNumber)

@@ -1,8 +1,8 @@
+from email.mime import message
 import os
 import time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import StaleElementReferenceException, ElementClickInterceptedException, TimeoutException, NoSuchElementException, ElementNotInteractableException
 #from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.support.ui import WebDriverWait
@@ -15,8 +15,10 @@ noTranscriptFoundFile = "SeleniumYoutubeBotNoTranscripts.txt"
 progressSavedFile = "SeleniumYoutubeBotSavedProgress.txt"
 thumbNailId = "#thumbnail"
 
-TIME_OUT = 1 #time out in seconds
-SHOW_TRANSCRIPT_MAX_TRY_COUNT = 20
+TIME_OUT = 0.5 #time out in seconds
+READ_TRANSCRIPT_MAX_TRY_COUNT = 4
+EXPAND_DESCRIPTION_MAX_TRY_COUNT = 4
+SHOW_TRANSCRIPT_MAX_TRY_COUNT = 4
 
 brave_path = r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe" #Replace with your actual path
 
@@ -48,18 +50,16 @@ def searchChannelForString(channelVideosURL, searchStringList, videoStartNumber,
   waitForDocumentReadyState()
 
   if backwardsSearch:
-    oldestVideosButton = driver.find_element(By.CSS_SELECTOR, ":nth-child(3) > #chip-container > #text")
-    if oldestVideosButton.is_displayed():
-      oldestVideosButton.click()
-      print("Performing search backwards")
-      waitForDocumentReadyState()
+    oldestVideosButton = driver.find_element(By.CSS_SELECTOR, "button[aria-label='Oldest']")
+    oldestVideosButton.click()
+    print("Performing search backwards")
+    waitForDocumentReadyState()
 
   #videoThumbnails = WebDriverWait(driver, TIME_OUT).until(EC.presence_of_all_elements_located(thumbNailLocator))
   videoThumbnails = driver.find_elements(By.CSS_SELECTOR, thumbNailId)
 
   currentNumberOfVisibleThumbnails = len(videoThumbnails)
   currentBottomOfPageHeight = driver.execute_script("return window.pageYOffset + window.innerHeight")
-  allVideosSearched = False
  
   try:
     allVideosSearched = False
@@ -79,7 +79,10 @@ def searchChannelForString(channelVideosURL, searchStringList, videoStartNumber,
         heightAfterScrollDown = driver.execute_script("return window.pageYOffset + window.innerHeight")
 
         #videoThumbnails = WebDriverWait(driver, TIME_OUT).until(EC.presence_of_all_elements_located(thumbNailLocator))
-        videoThumbnails = driver.find_elements(By.CSS_SELECTOR, thumbNailId)
+        videoThumbnails = driver.find_elements(
+                By.CSS_SELECTOR,
+                "ytd-rich-item-renderer a.ytLockupViewModelContentImage"
+              )
         currentNumberOfVisibleThumbnails = len(videoThumbnails)
 
         #Check if there aren't more video thumbnails to click on after scrolling down
@@ -118,7 +121,10 @@ def searchNextVideoThumbNail(searchStringList, backwardsSearch):
   clicked = False
   while clicked == False:
     try:
-      nextThumbNail = driver.find_element(By.XPATH, f"//ytd-rich-item-renderer[{nextVideoToCheck}]//a[@id='thumbnail']")
+      nextThumbNail = driver.find_element(
+        By.XPATH,
+        f"//ytd-rich-item-renderer[{nextVideoToCheck}]//a[contains(@class, 'ytLockupViewModelContentImage')]"
+      )
 
       if nextThumbNail:
         #Open the link in a new tab using Ctrl+Click (or Command+Click on macOS)
@@ -127,7 +133,7 @@ def searchNextVideoThumbNail(searchStringList, backwardsSearch):
         #actions.key_down(Keys.COMMAND).click(button).key_up(Keys.COMMAND).perform() #for Mac OS
         clicked = True
     except Exception as errorMessage:
-      print(errorMessage)
+      print(f"Error: {errorMessage}")
       print("Thumbnail not reachable. Attemping to scroll down.")
       #Scroll to the bottom incase we can't reach the video
       scrollToBottomOfPage()
@@ -141,7 +147,7 @@ def searchNextVideoThumbNail(searchStringList, backwardsSearch):
 
   #Skip age restricted videos that don't have transcripts
   try:
-    ageRestrictionProperty = driver.find_element(By.XPATH, "//meta[@property='og:restrictions:age']")
+    ageRestrictionProperty = driver.find_elements(By.XPATH, "//meta[@property='og:restrictions:age']")
     if ageRestrictionProperty:
       with open(noTranscriptFoundFile, "a") as file:
         print("Age restricted video. No transcript. Skipping video.")
@@ -150,129 +156,149 @@ def searchNextVideoThumbNail(searchStringList, backwardsSearch):
         nextVideoToCheck += 1
         closeVideoAndSwitchBackToMainTab()
       return
-  except NoSuchElementException:
+  except Exception as message:
+    print(f"Error: {message}")
     pass
     
   searched = False
+  readTranscriptTryCount = 0
   while searched == False:
-    '''
-    #Pause Video
-    clicked = False
-    #element_locator = By.CLASS_NAME, "ytp-play-button"
-    while clicked == False:
-      try:
-        #element = WebDriverWait(driver, TIME_OUT).until(EC.presence_of_element_located(element_locator))
-        element = driver.find_element(By.CLASS_NAME, "ytp-play-button")
-        if element.is_displayed():
-          element.click()
-          clicked = True
-      except StaleElementReferenceException:
-        print("The element is stale. Trying to pause video again.")
-    '''
-    #Dismiss Popup if it's there
-    #element_locator = By.CSS_SELECTOR, "#dismiss-button > yt-button-shape > button"
-    try:
-      #element = WebDriverWait(driver, TIME_OUT).until(EC.presence_of_element_located(element_locator))
-      dismissPopupButton = driver.find_element(By.CSS_SELECTOR, "#dismiss-button > yt-button-shape > button")
-      if dismissPopupButton.is_displayed():
-        dismissPopupButton.click()
-        print("Killed pop up!")
-    except (StaleElementReferenceException, NoSuchElementException):
-      pass
-
-    #Expand More Video Info
-    clicked = False
-    #element_locator = By.CSS_SELECTOR, "#description-inline-expander > #expand"
-    while clicked == False:
-      try:
-        #element = WebDriverWait(driver, TIME_OUT).until(EC.presence_of_element_located(element_locator))
-        expandMoreVideoInfoButton = driver.find_element(By.CSS_SELECTOR, "#description-inline-expander > #expand")
-        if expandMoreVideoInfoButton.is_displayed():
-          expandMoreVideoInfoButton.click()
-          clicked = True
-      except (StaleElementReferenceException, ElementClickInterceptedException, NoSuchElementException):
-        print("The expandMoreVideoInfoButton is stale. Trying to expand more info again.")
-        checkForSomethingWentWrongMessage()
-
-    #Show Transcript
-    clicked = False
-    showTranscriptTryCount = 0
-    #element_locator = By.CSS_SELECTOR, "#structured-description > :nth-child(2) > ytd-video-description-transcript-section-renderer.style-scope > #button-container > #primary-button > .style-scope > yt-button-shape > .yt-spec-button-shape-next"
-    while clicked == False:
-      try:
-        if showTranscriptTryCount < SHOW_TRANSCRIPT_MAX_TRY_COUNT:
+    if readTranscriptTryCount <= READ_TRANSCRIPT_MAX_TRY_COUNT:
+      '''
+      #Pause Video
+      clicked = False
+      #element_locator = By.CLASS_NAME, "ytp-play-button"
+      while clicked == False:
+        try:
           #element = WebDriverWait(driver, TIME_OUT).until(EC.presence_of_element_located(element_locator))
-          #showTranscriptButton = driver.find_element(By.CSS_SELECTOR, "#structured-description > :nth-child(2) > ytd-video-description-transcript-section-renderer.style-scope > #button-container > #primary-button > .style-scope > yt-button-shape > .yt-spec-button-shape-next")
-          showTranscriptButton = driver.find_element(By.XPATH, '//*[@id="primary-button"]/ytd-button-renderer/yt-button-shape/button/yt-touch-feedback-shape/div[2]')
+          element = driver.find_element(By.CLASS_NAME, "ytp-play-button")
+          if element.is_displayed():
+            element.click()
+            clicked = True
+        except StaleElementReferenceException:
+          print("The element is stale. Trying to pause video again.")
+      '''
+      #Dismiss Popup if it's there
+      #element_locator = By.CSS_SELECTOR, "#dismiss-button > yt-button-shape > button"
+      try:
+        #element = WebDriverWait(driver, TIME_OUT).until(EC.presence_of_element_located(element_locator))
+        dismissPopupButton = driver.find_elements(By.CSS_SELECTOR, "#dismiss-button > yt-button-shape > button")
+        if dismissPopupButton:
+          if dismissPopupButton[0].is_displayed():
+            dismissPopupButton[0].click()
+            print("Killed pop up!")
+      except Exception:
+        pass
+
+      #Expand More Video Info
+      clicked = False
+      expandDescriptionTryCount = 0
+      while clicked == False:
+        try:
+          element_locator = By.CSS_SELECTOR, "#description-inline-expander > #expand"
+          expandMoreVideoInfoButton = WebDriverWait(driver, 4).until(EC.presence_of_element_located(element_locator))
+          if expandMoreVideoInfoButton.is_displayed():
+            expandMoreVideoInfoButton.click()
+            clicked = True
+        except Exception as message:
+          print(f"Error: {message}")
+          checkForSomethingWentWrongMessage()
+          if expandDescriptionTryCount >= EXPAND_DESCRIPTION_MAX_TRY_COUNT:
+            recordSkippedVideoAndMoveOn()
+            return
+          expandDescriptionTryCount += 1
+          print(f"Failed to click Expand Description button. Retry {expandDescriptionTryCount} of {EXPAND_DESCRIPTION_MAX_TRY_COUNT}")
+
+      #Show Transcript
+      clicked = False
+      showTranscriptTryCount = 0
+      #element_locator = By.CSS_SELECTOR, "#structured-description > :nth-child(2) > ytd-video-description-transcript-section-renderer.style-scope > #button-container > #primary-button > .style-scope > yt-button-shape > .yt-spec-button-shape-next"
+      while clicked == False:
+        try:
+          #element = WebDriverWait(driver, TIME_OUT).until(EC.presence_of_element_located(element_locator))
+          element_locator = By.XPATH, '//*[@id="primary-button"]/ytd-button-renderer/yt-button-shape/button/yt-touch-feedback-shape/div[2]'
+          showTranscriptButton = WebDriverWait(driver, 4).until(EC.presence_of_element_located(element_locator))
+          #showTranscriptButton = driver.find_element(By.XPATH, '//*[@id="primary-button"]/ytd-button-renderer/yt-button-shape/button/yt-touch-feedback-shape/div[2]')
 
           #showTranscriptButton.click()
           # 3. Execute JavaScript click directly on the element
           driver.execute_script("arguments[0].click();", showTranscriptButton)
           clicked = True
-        else:
-          with open(noTranscriptFoundFile, "a") as file:
-            print("No transcript button found. Skipping video.")
-            file.write(f"Video Number: {nextVideoToCheck}" + "\n")
-            file.write(driver.current_url + "\n")
-            nextVideoToCheck += 1
-            closeVideoAndSwitchBackToMainTab()
-          return
-      except (StaleElementReferenceException, ElementClickInterceptedException, NoSuchElementException, ElementNotInteractableException) as message:
-        print(message)
-        print("The element is stale. Trying to show transcript again.")
-        checkForSomethingWentWrongMessage()
-        showTranscriptTryCount += 1
+        except Exception as message:
+          print(f"Error: {message}")
+          checkForSomethingWentWrongMessage()
+          if showTranscriptTryCount >= SHOW_TRANSCRIPT_MAX_TRY_COUNT:
+            recordSkippedVideoAndMoveOn()
+            return
+          showTranscriptTryCount += 1
+          print(f"Failed to click Show Transcript button. Retry {showTranscriptTryCount} of {SHOW_TRANSCRIPT_MAX_TRY_COUNT}")
 
-    #Search Transcript
-    cssSelector = "#segments-container > ytd-transcript-segment-renderer"
-    element_locator = By.CSS_SELECTOR, cssSelector
-    try:
-      transcriptLines = WebDriverWait(driver, TIME_OUT).until(EC.presence_of_all_elements_located(element_locator))
-      #elements = driver.find_elements(By.CSS_SELECTOR, cssSelector) This doesn't return any of them
-      print("transcript lines: ", len(transcriptLines))
+      #Search Transcript
+      cssSelector = "transcript-segment-view-model"
+      element_locator = By.CSS_SELECTOR, cssSelector
+      try:
+        transcriptLines = WebDriverWait(driver, 4).until(EC.presence_of_all_elements_located(element_locator))
+        #elements = driver.find_elements(By.CSS_SELECTOR, cssSelector) This doesn't return any of them
+        print("transcript lines: ", len(transcriptLines))
 
-      found = False
-      for transcriptLine in transcriptLines:
-        if found == True:
-          break
-        for searchString in searchStringList:
-          if searchString.lower() in transcriptLine.text.lower():
-            #If match found, append it to MatchFoundFile
-            with open(matchFoundFile, "a") as file:
-              print("Found string!")
-              file.write(f"Video Number: {nextVideoToCheck}" + "\n")
-              file.write(driver.current_url + "\n")
-            found = True
+        found = False
+        for transcriptLine in transcriptLines:
+          if found == True:
             break
-      #Create/overwrite progress file to save the last video number and url that was checked in case of restarts
-      with open(progressSavedFile, "w") as file:
-        global searchStartTime
-        saveTime = time.time()
-        checkPointTime = saveTime - searchStartTime
+          for searchString in searchStringList:
+            if searchString.lower() in transcriptLine.text.lower():
+              #If match found, append it to MatchFoundFile
+              with open(matchFoundFile, "a") as file:
+                print("Found string!")
+                file.write(f"Video Number: {nextVideoToCheck}" + "\n")
+                file.write(driver.current_url + "\n")
+              found = True
+              break
+        #Create/overwrite progress file to save the last video number and url that was checked in case of restarts
+        with open(progressSavedFile, "w") as file:
+          global searchStartTime
+          saveTime = time.time()
+          checkPointTime = saveTime - searchStartTime
 
-        #Convert seconds into hours, minutes, and remaining seconds
-        hours = int(checkPointTime // 3600)  #Divide by 3600 (seconds in an hour)
-        minutes = int((checkPointTime % 3600) // 60)  #Get the remainder and divide by 60
-        seconds = int(checkPointTime % 60)  #Get the remainder after dividing by 60
+          #Convert seconds into hours, minutes, and remaining seconds
+          hours = int(checkPointTime // 3600)  #Divide by 3600 (seconds in an hour)
+          minutes = int((checkPointTime % 3600) // 60)  #Get the remainder and divide by 60
+          seconds = int(checkPointTime % 60)  #Get the remainder after dividing by 60
 
-        file.write(f"Backwards Search: {backwardsSearch}" + "\n")
-        file.write(f"Last Video Number Checked: {nextVideoToCheck}" + "\n")
-        file.write(f"URL: {driver.current_url}" + "\n")
-        file.write(f"Current run time: {hours} hours, {minutes} minutes, and {seconds} seconds")
+          file.write(f"Backwards Search: {backwardsSearch}" + "\n")
+          file.write(f"Last Video Number Checked: {nextVideoToCheck}" + "\n")
+          file.write(f"URL: {driver.current_url}" + "\n")
+          file.write(f"Current run time: {hours} hours, {minutes} minutes, and {seconds} seconds")
 
-      searched = True
-      nextVideoToCheck += 1
-    except (StaleElementReferenceException, ElementClickInterceptedException, TimeoutException):
-      print("Transcript not readabled. Reloading page and trying again.")
-      driver.refresh()#Reload page since transcript probably says "No Results Found" and try all the steps again starting back at the "#Pause Video" step
-
+        searched = True
+        nextVideoToCheck += 1
+      except Exception:
+        readTranscriptTryCount += 1
+        if readTranscriptTryCount > READ_TRANSCRIPT_MAX_TRY_COUNT:
+          recordSkippedVideoAndMoveOn()
+          return
+        print(f"Transcript not readabled. Reloading page and trying again. Retry {readTranscriptTryCount} of {READ_TRANSCRIPT_MAX_TRY_COUNT}")
+        driver.refresh()#Reload page since transcript probably says "No Results Found" and try all the steps again starting back at the "#Pause Video" step  
+    else:
+      recordSkippedVideoAndMoveOn()
+      return
+    
   #Print out video parse time
   videoParseEndTime = time.time()
   videoParseTime = videoParseEndTime - videoParseStartTime
   print(f"Video took {videoParseTime} seconds to parse.")
 
   closeVideoAndSwitchBackToMainTab()
-  
+
+def recordSkippedVideoAndMoveOn():
+  global nextVideoToCheck
+  with open(noTranscriptFoundFile, "a") as file:
+    print("Couldn't read transcript. Recording URL and skipping video.")
+    file.write(f"Video Number: {nextVideoToCheck}" + "\n")
+    file.write(driver.current_url + "\n")
+    nextVideoToCheck += 1
+    closeVideoAndSwitchBackToMainTab()
+
 def waitForDocumentReadyState():
   while driver.execute_script("return document.readyState") != "complete":
     pass
@@ -291,15 +317,15 @@ def checkForSomethingWentWrongMessage():
     driver.find_element(By.XPATH, "//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'something went wrong. refresh or try again later.')]")
     print("Something went wrong message, reloading video")
     driver.refresh()
-  except NoSuchElementException:
+  except Exception:
     pass
   
-channelVideosURL = "https://www.youtube.com/@SecularTalk/videos"
+channelVideosURL = "https://www.youtube.com/@kagethedon001/videos"
 
 videoStartNumber = 1 # Start the search from this video number from the top down on the youtube channel
 #videoStartNumber = 7433 #Start the search from this video number from the top down on the youtube channel
 videoStopNumber = -1 #-1 if unused
-searchStringList = ["Jiggly Puff", "JigglyPuff"]
+searchStringList = ["Lock in", "On business"]
 backwardsSearch = False
 
 searchChannelForString(channelVideosURL, searchStringList, videoStartNumber, videoStopNumber, backwardsSearch)
