@@ -325,7 +325,7 @@ channelVideosURL = "https://www.youtube.com/@kagethedon001/videos"
 videoStartNumber = 1 # Start the search from this video number from the top down on the youtube channel
 #videoStartNumber = 7433 #Start the search from this video number from the top down on the youtube channel
 videoStopNumber = -1 #-1 if unused
-searchStringList = ["Lock in", "On business"]
+searchStringList = ["Lock in", "Locked in", "On business"]
 backwardsSearch = False
 
 searchChannelForString(channelVideosURL, searchStringList, videoStartNumber, videoStopNumber, backwardsSearch)
